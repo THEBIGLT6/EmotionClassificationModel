@@ -1,0 +1,9 @@
+# Python Cache
+__pycache__/
+
+# Personal test images
+Images/
+Images_Transformed/
+
+# Tester Scripts
+transform-test.py

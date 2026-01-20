@@ -1,6 +1,6 @@
-# EmotionClassificationModel
-CompSci 4452 Deep Learning in Computer Vision - Project
-Liam Truss
+# Emotion Classification Model
+CompSci 4452 Deep Learning in Computer Vision - Project \
+Liam Truss \
 April 3rd, 2026
 
 ## Dataset
