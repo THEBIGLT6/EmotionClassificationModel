@@ -3,7 +3,9 @@ __pycache__/
 
 # Personal test images
 Images/
-Images_Transformed/
 
-# Tester Scripts
-transform-test.py
+# Produced Grad-CAM images
+GradCAM/
+
+# Results / Graphs
+Results/

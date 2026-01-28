@@ -1,10 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from sklearn.metrics import f1_score
 
 from collections import Counter
 from dataset import get_dataloaders
-from model import EmotionClassificationNN
+from model import EmotionClassificationNN, EmotionClassificationAttentionNN
 
 # Training function for one epoch
 def train_one_epoch(model, loader, criterion, optimizer, device):
@@ -41,12 +42,16 @@ def train_one_epoch(model, loader, criterion, optimizer, device):
     return epoch_loss, epoch_acc
 
 
+# Function for validating the model, returning loss, accuracy and F1 score
 @torch.no_grad()
 def validate(model, loader, criterion, device):
     model.eval()
     running_loss = 0.0
     correct = 0
     total = 0
+
+    all_preds = []
+    all_labels = []
 
     for images, labels in loader:
         images = images.to(device)
@@ -57,23 +62,50 @@ def validate(model, loader, criterion, device):
 
         running_loss += loss.item() * images.size(0)
         _, preds = torch.max(outputs, 1)
+
+        all_preds.append(preds.cpu())
+        all_labels.append(labels.cpu())
+
         correct += (preds == labels).sum().item()
         total += labels.size(0)
 
+    all_preds = torch.cat(all_preds)
+    all_labels = torch.cat(all_labels)
+
     epoch_loss = running_loss / total
     epoch_acc = correct / total
+    epoch_f1 = f1_score( all_labels.numpy(), all_preds.numpy(), average="macro" )
 
-    return epoch_loss, epoch_acc
+    return epoch_loss, epoch_acc, epoch_f1
 
 
-def main():
+# Main training loop
+def train_model( model, model_name, train_loader, val_loader, criterion, optimizer, device, epochs ):
+    best_val_acc = 0.0
+    best_f1_score = 0.0
+
+    for epoch in range( epochs ):
+
+        train_loss, train_acc = train_one_epoch( model, train_loader, criterion, optimizer, device )
+        val_loss, val_acc, val_f1 = validate( model, val_loader, criterion, device )
+
+        print( f"[{model_name}] Epoch [{epoch+1}/{epochs}] Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f} | Val F1: {val_f1:.4f}" )
+
+        if val_f1 > best_f1_score:
+            best_f1_score = val_f1
+            torch.save( model.state_dict(), f"Models/best_{model_name}.pth" )
+
+    print(f"[{model_name}] Best Val F1 Score: {best_f1_score:.4f}")
+    return best_f1_score
+
+
+if __name__ == "__main__":
 
     train_path = "TrainData"
     test_path = "TestData"
-    best_val_acc = 0.0
 
     batch_size = 64
-    epochs = 30
+    epochs = 60
     learning_rate = 1e-3
     weight_decay = 1e-4
 
@@ -82,8 +114,8 @@ def main():
     print(f"Using device: {device}")
 
     # Data
-    train_loader, train_dataset = get_dataloaders( train_path, batch_size=batch_size, shuffle=True )
-    val_loader, val_dataset = get_dataloaders( test_path, batch_size=batch_size, shuffle=False )
+    train_loader, train_dataset = get_dataloaders( train_path, batch_size=batch_size, shuffle=True, is_train=True )
+    val_loader, val_dataset = get_dataloaders( test_path, batch_size=batch_size, shuffle=False, is_train=False )
 
     # Dealing with class imbalance
     class_names = train_dataset.classes
@@ -95,32 +127,33 @@ def main():
     class_weights = class_weights / class_weights.sum() * num_classes
     class_weights = class_weights.to(device)
 
-    # Model
-    model = EmotionClassificationNN( num_classes=num_classes )
-    model.to( device )
+    # Model training
+    criterion = nn.CrossEntropyLoss( weight=class_weights, label_smoothing=0.1 )
 
-    # Training setup
-    criterion = nn.CrossEntropyLoss( label_smoothing=0.1 )
-    optimizer = optim.Adam( model.parameters(), lr=learning_rate, weight_decay=weight_decay )
+    baseline_model = EmotionClassificationNN(num_classes=num_classes).to(device)
+    baseline_optimizer = optim.Adam( baseline_model.parameters(), lr=learning_rate, weight_decay=weight_decay )
+    
+    baseline_acc = train_model(
+        model=baseline_model,
+        model_name="baseline",
+        train_loader=train_loader,
+        val_loader=val_loader,
+        criterion=criterion,
+        optimizer=baseline_optimizer,
+        device=device,
+        epochs=epochs
+    )
 
-    # Training loop
-    for epoch in range( epochs ):
+    attention_model = EmotionClassificationAttentionNN(num_classes=num_classes).to(device)
+    attention_optimizer = optim.Adam( attention_model.parameters(), lr=learning_rate, weight_decay=weight_decay )
 
-        train_loss, train_acc = train_one_epoch( model, train_loader, criterion, optimizer, device )
-        val_loss, val_acc = validate( model, val_loader, criterion, device )
-
-        print(
-            f"Epoch [{epoch+1}/{epochs}] "
-            f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f} "
-            f"Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}"
-        )
-
-        if val_acc > best_val_acc:
-            best_val_acc = val_acc
-            torch.save( model.state_dict(), "Models/best_emotion_model.pth" )
-
-    print( f"Best Validation Accuracy: {best_val_acc:.4f}" )
-
-
-if __name__ == "__main__":
-    main()
+    attention_acc = train_model(
+        model=attention_model,
+        model_name="attention",
+        train_loader=train_loader,
+        val_loader=val_loader,
+        criterion=criterion,
+        optimizer=attention_optimizer,
+        device=device,
+        epochs=epochs
+    )
