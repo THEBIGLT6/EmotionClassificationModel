@@ -9,6 +9,8 @@ from model import EmotionClassificationNN, EmotionClassificationAttentionNN
 from gradcam import GradCAM
 
 
+# ----- Model Loading and Prediction -----
+
 # Load in both models
 def load_models(baseline_path, attention_path, num_classes, device):
 
@@ -52,6 +54,8 @@ def load_image( image_path, device ):
     return image
 
 
+# ----- Grad-CAM Evaluation -----
+
 # Run Grad-CAM on a given image and model
 def run_gradcam( image_tensor, model, target_layer ):
     gradcam = GradCAM( model, target_layer )
@@ -81,8 +85,7 @@ def overlay_cam(image_path, cam, output_path):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     cv2.imwrite(output_path, overlay)
 
-
-# Main functionailty 
+#  ----- Main  -----
 if __name__ == "__main__":
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

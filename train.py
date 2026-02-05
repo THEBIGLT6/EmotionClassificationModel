@@ -95,7 +95,7 @@ def train_model( model, model_name, train_loader, val_loader, criterion, optimiz
             best_f1_score = val_f1
             torch.save( model.state_dict(), f"Models/best_{model_name}.pth" )
 
-    print(f"[{model_name}] Best Val F1 Score: {best_f1_score:.4f}")
+    print( f"[{model_name}] Best Val F1 Score: {best_f1_score:.4f}" )
     return best_f1_score
 
 
@@ -105,7 +105,7 @@ if __name__ == "__main__":
     test_path = "TestData"
 
     batch_size = 64
-    epochs = 60
+    epochs = 30
     learning_rate = 1e-3
     weight_decay = 1e-4
 
