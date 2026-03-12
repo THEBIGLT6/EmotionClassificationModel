@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score
 
 from collections import Counter
@@ -78,22 +79,50 @@ def validate(model, loader, criterion, device):
 
     return epoch_loss, epoch_acc, epoch_f1
 
+# Function to plot Training, validation accuracy and F1 curves
+def plot_training_curves(train_acc, val_acc, val_f1, model_name):
+
+    epochs = range(1, len(train_acc) + 1)
+
+    plt.figure()
+
+    plt.plot(epochs, train_acc, label="Train Accuracy")
+    plt.plot(epochs, val_acc, label="Validation Accuracy")
+    plt.plot(epochs, val_f1, label="Validation F1")
+
+    plt.xlabel("Epoch")
+    plt.ylabel("Score")
+    plt.title(f"{model_name} Training Metrics")
+    plt.legend()
+
+    plt.savefig(f"Results/{model_name}_training_curves.png", dpi=300)
+    plt.close()
 
 # Main training loop
 def train_model( model, model_name, train_loader, val_loader, criterion, optimizer, device, epochs ):
     best_val_acc = 0.0
     best_f1_score = 0.0
 
+    train_acc_history = []
+    val_acc_history = []
+    val_f1_history = []
+
     for epoch in range( epochs ):
 
         train_loss, train_acc = train_one_epoch( model, train_loader, criterion, optimizer, device )
         val_loss, val_acc, val_f1 = validate( model, val_loader, criterion, device )
+
+        train_acc_history.append(train_acc)
+        val_acc_history.append(val_acc)
+        val_f1_history.append(val_f1)
 
         print( f"[{model_name}] Epoch [{epoch+1}/{epochs}] Train Acc: {train_acc:.4f} | Val Acc: {val_acc:.4f} | Val F1: {val_f1:.4f}" )
 
         if val_f1 > best_f1_score:
             best_f1_score = val_f1
             torch.save( model.state_dict(), f"Models/best_{model_name}.pth" )
+
+    plot_training_curves( train_acc_history, val_acc_history, val_f1_history, model_name )
 
     print( f"[{model_name}] Best Val F1 Score: {best_f1_score:.4f}" )
     return best_f1_score
